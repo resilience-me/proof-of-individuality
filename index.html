@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Proof-of-individuality by resilience-me</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Proof-of-individuality</h1>
+      <h2 class="project-tagline">The Proof-of-Individuality (POI) protocol is a fully anonymous anti-sybil protocol </h2>
+      <a href="https://github.com/resilience-me/proof-of-individuality" class="btn">View on GitHub</a>
+      <a href="https://github.com/resilience-me/proof-of-individuality/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/resilience-me/proof-of-individuality/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h3>
+<a id="randomized-pseudonym-parties-using-video-hangouts" class="anchor" href="#randomized-pseudonym-parties-using-video-hangouts" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Randomized pseudonym parties using video hangouts</h3>
+
+<pre><code>contract poi {
+
+    bool debug;
+    uint blockNum;
+
+    uint groupSize;
+    bytes32 entropy;
+
+    uint public numUsers;
+    mapping(address =&gt; bytes32) public userHash;
+    //mapping(bytes32 =&gt; address) public userAddress;
+    mapping(address =&gt; uint) public userGroup;
+
+    // max value of a sha3 hash
+    bytes32 maxHash = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+
+    enum Phases { Registration, Commitment, Verification } 
+    event Registration(bytes32 userHash);
+    event Commitment(bytes32 userHash, uint group);
+    event Verification(bytes32 userHash);
+
+    Phases phase;
+    uint public genesisBlock;
+    uint public registrationBlock;
+    uint public commitmentBlock;
+    uint public validityBlock;
+
+    function blockNumber() constant returns(uint){ if (debug) { return blockNum; } return block.number; }
+    function numGroups() constant returns(uint){ return numUsers / groupSize;}
+
+    function poi(){
+        debug = true;
+        groupSize = 5;
+        entropy = sha3(block.blockhash(block.number));
+        genesisBlock = block.number;
+        registrationBlock = genesisBlock + 7;
+        commitmentBlock = registrationBlock + 3;
+        validityBlock = commitmentBlock + 20;
+        phase = Phases.Registration;
+    }
+
+    function register() returns(bool success){
+        if ((blockNumber() &gt; registrationBlock) // registation period over
+        || (userHash[msg.sender] != bytes32(0))) return; // already registered
+
+        // generate a hash for the given user, using previous entropy, 
+        // senders address and current blocknumber.
+        bytes32 h = sha3(entropy, msg.sender, block.blockhash(block.number));
+        entropy = h;
+        userHash[msg.sender] = h;
+        //userAddress[h] = msg.sender;
+        numUsers++;
+        Registration(h);
+        return true;
+    }
+
+    function commit() returns(bool success){
+        if ((blockNumber() &lt; registrationBlock) // registation period not yet over
+        || (blockNumber() &gt; commitmentBlock) // commitment period over
+        || (userGroup[msg.sender] != 0)) return; // group already assigned
+
+        phase = Phases.Commitment;
+
+        // deterministically assign user to random group (1-indexed)
+        // based on number of users, group size and user hash;
+        userGroup[msg.sender] = uint(userHash[msg.sender]) / (uint(maxHash) / numGroups()) + 1;
+        Commitment(userHash[msg.sender], userGroup[msg.sender]);
+        return true;
+    }
+
+    function verify(bytes32 data, uint8 v, bytes32 r, bytes32 s ) returns(bool success){
+        if ((blockNumber() &lt; commitmentBlock) // commitment period not yet over
+        || (blockNumber() &gt; validityBlock) // verification period over
+        || (userGroup[msg.sender] == 0)) return;
+
+        phase = Phases.Verification;
+
+        // TODO :)
+        address signer = ecrecover( data, v, r, s);
+        // is the proof provided by a user in the same group
+        if (userGroup[signer] == userGroup[msg.sender]) {
+            Verification(userHash[msg.sender]);
+            return true;
+        }
+    }
+
+    function _incBlock() { if (debug) blockNum++; }
+    function _myAddressHelper() constant returns(address){ return msg.sender; }
+    function _myGroupHelper() constant returns(uint group) {
+        return userGroup[msg.sender];
+    }
+
+}
+</code></pre>
+
+<h3>
+<a id="anonymous-and-untraceable-poi-tokens" class="anchor" href="#anonymous-and-untraceable-poi-tokens" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Anonymous and untraceable POI tokens</h3>
+
+<pre><code>/* component of the Proof-of-individuality (POI) system. Generates new POIs each month, anonymous and un-traceable */
+
+contract generatePOItokens{
+    address owner;
+
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+
+    mapping (address =&gt; uint256) public balanceOf;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    function generatePOItokens(address[] verifiedUsers) {
+        owner = msg.sender;
+        balanceOf[owner] = verifiedUsers.length;            // Give the creator all initial tokens                    
+        name = "POI";                                       // Set the name for display purposes     
+        symbol = "POI";                                     // Set the symbol for display purposes    
+        decimals = 0;                                       // Amount of decimals for display purposes        
+
+      /* Send POIs to every verified address */
+
+        for (uint i = 0; i &lt; verifiedUsers.length; i++)
+           balanceOf[owner] -= 1;                                              
+           balanceOf[verifiedUsers[i]] += 1;
+           Transfer(owner, verifiedUsers[i], 1);            // Notify anyone listening that this transfer took place
+    }
+
+
+    function depricatePOIs() {
+     if (msg.sender == owner) suicide(owner);
+    }
+
+}
+
+contract POIscheduler{
+
+address[] verifiedUsers;
+address POIaddress;
+
+uint public genesisblock;
+uint public roundLength;
+uint public nextRound;
+
+    function POIscheduler(){
+    owner = msg.sender;
+    genesisblock = block.number;
+    roundLength = 3000; // set POI pseudonym parties to happen once a month
+    nextRound = genesisblock + roundLength;
+    scheduleCall();
+    }
+
+    function issuePOIs() {
+        if(block.number&lt;nextRound)
+            throw;
+        // depricate old POIs
+        generatePOItokens(POIaddress).depricatePOIs();
+
+        POIaddress = new generatePOItokens(verifiedUsers);
+
+        /* schedule a new POI round one month from now */
+
+        nextRound += roundLength;
+        scheduleCall();
+    }
+
+
+    function scheduleCall() public {
+
+     /* ethereum-alarm-clock is a DAO for excecuting scheduled calls */
+
+        address scheduler = 0x26416b12610d26fd31d227456e9009270574038f; // alarm service v0.7 on the morden testnet
+
+        // the 4-byte signature of the local function we want to be called.
+        bytes4 sig = bytes4(sha3("issuePOIs()"));
+
+        // approximately 1 month from now
+        uint targetBlock = nextRound;
+
+        // the 4-byte signature of the scheduleCall function.
+        bytes4 scheduleCallSig = bytes4(sha3("scheduleCall(bytes4,uint256)"));
+
+        scheduler.call(scheduleCallSig, sig, targetBlock);
+    }
+
+    function verifyPOI (address v) constant returns (string){
+    if (generatePOItokens(POIaddress).balanceOf[v]==0){
+        return "account does not have a valid POI";
+    }
+    return "account has a valid POI";
+    }   
+
+}
+</code></pre>
+
+<h3>
+<a id="anti-sybil-fuel-asf" class="anchor" href="#anti-sybil-fuel-asf" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Anti-Sybil Fuel (ASF)</h3>
+
+<pre><code>/* 
+Anti-sybil fuel (ASF) is used to gamify the POI hangouts. Participants can 
+use it to "hijack each other's attention", which makes it easier for the 
+POI community to keep high standards. Each user gets 5000 "anti-sybil fuel" points, 
+and then rewards the other 4 users for their attention. This makes it possible 
+for 4 people to put peer-pressure on the 5th if the 5th person isn't focused 
+on the joint attention test. 
+*/
+
+contract AntiSybilFuel { 
+    /* Public variables of the token */
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+
+    struct ASF {
+        uint256 rewarded;
+        uint256 given;
+    }
+
+    mapping (address =&gt; uint256) public balanceOf;
+    mapping (address =&gt; ASF) public ASFbalance;
+
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    function AntiSybilFuel(address[] hangoutGroup) {
+
+        balanceOf[msg.sender] = 25000;
+        name = "Anti-Sybil Fuel";     
+        symbol = "ASF";
+        decimals = 0;
+
+        for (uint i = 0; i &lt; hangoutGroup.length; i++)
+            balanceOf[msg.sender] -= 5000;                                              
+            balanceOf[hangoutGroup[i]] += 5000;
+            Transfer(msg.sender, hangoutGroup[i], 5000); 
+
+    }
+
+    function rewardASF(address _from, address _to, uint256 _value) {
+        if (ASFbalance[_from].given + _value &gt;5000) // 5000 is max amount you can give
+        _value = _value-((ASFbalance[_to].rewarded+_value)-5000); //transfer max reward
+
+        if (ASFbalance[_to].rewarded + _value &gt;5000) // 5000 is max amount you can recieve
+        _value = _value-((ASFbalance[_to].rewarded+_value)-5000); //transfer max reward
+        balanceOf[_from] -= _value;                          
+        balanceOf[_to] += _value;                                     
+        Transfer(msg.sender, _to, _value);
+        ASFbalance[_from].given +=_value;
+        ASFbalance[_to].rewarded +=_value;
+
+    } 
+
+}            
+</code></pre>
+
+<p><img src="http://i.imgur.com/M138htP.png" alt=""></p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/resilience-me/proof-of-individuality">Proof-of-individuality</a> is maintained by <a href="https://github.com/resilience-me">resilience-me</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
