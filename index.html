@@ -242,11 +242,13 @@ contract AntiSybilFuel {
     }
 
     mapping (address =&gt; ASF) public ASFbalances;
+    address[] participants;
 
     function AntiSybilFuel(address[] hangoutGroup) {
 
         for (uint i = 0; i &lt; hangoutGroup.length; i++)
             ASFbalances[hangoutGroup[i]].initial_supply += 5000;
+            groupMembers.push(hangoutGroup[i])
 
             genesisblock = block.number;
             deadline = genesisblock + 3000; // hangouts are 15 minutes long
@@ -277,12 +279,18 @@ contract AntiSybilFuel {
 
    function closeSession(){
       if(block.number&lt;deadline) throw;
-       */ do checkup */
-       */ generate POIs, see contract generatePOItokens */
+
+      for(uint i = 0; i &lt; participants.length; i++)
+        if(participants[i].given &gt;4000 &amp;&amp; participants[i].rewarded &gt;4000)
+        address[] verifiedUsers.push(participants[i])
+
+       */ pass verifiedUsers into a contract that generates POIs, together with verifiedUsers from all other hangouts */
+       */ see contract generatePOItokens */
+
    }
 
 
-}                     
+}                       
 </code></pre>
 
       <footer class="site-footer">
