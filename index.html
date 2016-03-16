@@ -231,6 +231,9 @@ on the joint attention test.
 
 contract AntiSybilFuel { 
 
+  uint public genesisblock;
+  uint public deadline;
+
 
     struct ASF {
         uint256 initial_supply;
@@ -244,6 +247,10 @@ contract AntiSybilFuel {
 
         for (uint i = 0; i &lt; hangoutGroup.length; i++)
             ASFbalances[hangoutGroup[i]].initial_supply += 5000;
+
+            genesisblock = block.number;
+            deadline = genesisblock + 3000; // hangouts are 15 minutes long
+
     }
 
     function rewardASF(address _to, uint256 _value) {
@@ -259,19 +266,23 @@ contract AntiSybilFuel {
     /* transfer the anti sybil fuel */
         ASFbalances[msg.sender].given +=_value;
         ASFbalances[_to].rewarded +=_value;
+        ASFbalances[msg.sender].initial_supply -=_value;
+
    } 
 
    /* after 15 minutes, each users that has been awarded 4000 ASF or more, and 
       given out 4000 or more, is seen as verified and given a POI token */
 
-   function verification(){
+   /* the closeSession function can be called by anyone in the hangut once the deadline has passed */
+
+   function closeSession(){
+      if(block.number&lt;deadline) throw;
        */ do checkup */
        */ generate POIs, see contract generatePOItokens */
    }
 
 
-
-}            
+}                     
 </code></pre>
 
       <footer class="site-footer">
