@@ -230,49 +230,46 @@ on the joint attention test.
 */
 
 contract AntiSybilFuel { 
-    /* Public variables of the token */
-    string public name;
-    string public symbol;
-    uint8 public decimals;
+
 
     struct ASF {
+        uint256 initial_supply;
         uint256 rewarded;
         uint256 given;
     }
 
-    mapping (address =&gt; uint256) public balanceOf;
-    mapping (address =&gt; ASF) public ASFbalance;
-
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
+    mapping (address =&gt; ASF) public ASFbalances;
 
     function AntiSybilFuel(address[] hangoutGroup) {
 
-        balanceOf[msg.sender] = 25000;
-        name = "Anti-Sybil Fuel";     
-        symbol = "ASF";
-        decimals = 0;
-
         for (uint i = 0; i &lt; hangoutGroup.length; i++)
-            balanceOf[msg.sender] -= 5000;                                              
-            balanceOf[hangoutGroup[i]] += 5000;
-            Transfer(msg.sender, hangoutGroup[i], 5000); 
-
+            ASFbalances[hangoutGroup[i]].initial_supply += 5000;
     }
 
-    function rewardASF(address _from, address _to, uint256 _value) {
-        if (ASFbalance[_from].given + _value &gt;5000) // 5000 is max amount you can give
-        _value = _value-((ASFbalance[_to].rewarded+_value)-5000); //transfer max reward
+    function rewardASF(address _to, uint256 _value) {
 
-        if (ASFbalance[_to].rewarded + _value &gt;5000) // 5000 is max amount you can recieve
-        _value = _value-((ASFbalance[_to].rewarded+_value)-5000); //transfer max reward
-        balanceOf[_from] -= _value;                          
-        balanceOf[_to] += _value;                                     
-        Transfer(msg.sender, _to, _value);
-        ASFbalance[_from].given +=_value;
+    /* If the sent amount is bigger than the maximum amount one can give, send max amount */
+        if (ASFbalance[msg.sender].given + _value &gt;5000)
+        _value = _value-((ASFbalance[_to].rewarded+_value)-5000);
+
+    /* If the sent amount is bigger than the maximum reward limit, send max amount */
+        if (ASFbalance[_to].rewarded + _value &gt;5000)
+        _value = _value-((ASFbalance[_to].rewarded+_value)-5000);
+
+    /* transfer the anti sybil fuel */
+        ASFbalance[msg.sender].given +=_value;
         ASFbalance[_to].rewarded +=_value;
+   } 
 
-    } 
+   /* after 15 minutes, each users that has been awarded 4000 ASF or more, and 
+      awarded 4000 or more, is seen as verified and given a POI token */
+
+   function verification(){
+       */ do checkup */
+       */ generate POIs, see contract generatePOItokens */
+   }
+
+
 
 }            
 </code></pre>
